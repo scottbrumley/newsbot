@@ -198,7 +198,7 @@ function addFeedToES(indexStr,typeStr,id, urlStr, titleStr, channel){
 function addArticleToES(indexStr,typeStr,id, guid, pubDate, link, categories, channel, isoDate){
     host = elastichost;
     protocol = "http://";
-    myURLStr = protocol + host + "/" + indexStr + "/" + typeStr + "/" + id;
+    myURLStr = protocol + host + "/" + indexStr + "/" + typeStr + "/" + id + "-" + channel;
 
     jsonBody = {
         published_at: pubDate,
@@ -240,7 +240,7 @@ function firstFeed(urlStr, channel){
             console.log("URL: " + entry.link);
             console.log("Date: " + entry.pubDate);
             console.log("GUID: "  + entry.guid);
-            console.log("ID: " + new Buffer(entry.guid).toString('base64'));
+            console.log("ID: " + new Buffer(entry.guid).toString('base64') + "-" + channel);
             console.log("Categories: " + entry.categories);
             console.log("Channel: " + channel);
             console.log("ISO Date: " + entry.isoDate);
