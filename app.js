@@ -90,10 +90,10 @@ else {
     console.log('Using localhost on port 80.');
 }
 
-function addFeedToES(indexStr,typeStr,id, urlStr, titleStr, channel){
+function addArticleToES(indexStr,typeStr,id, urlStr, titleStr, channel){
     host = elastichost;
     protocol = "http://";
-    myURLStr = protocol + host + "/" + indexStr + "/" + typeStr + "/" + id;
+    myURLStr = protocol + host + "/" + indexStr + "/" + typeStr + "/" + id + "-" + channel;
     var isodate = new Date().toISOString()
 
     jsonBody = {
@@ -240,7 +240,7 @@ function firstFeed(session, urlStr, channel){
         console.log(parsed.feed.title);
         rssId = new Buffer(urlStr).toString('base64');
         console.log(rssId);
-        addFeedToES(esIndex,"rss",rssId,urlStr,parsed.feed.title,channel);
+        addArticleToES(esIndex,"rss",rssId,urlStr,parsed.feed.title,channel);
 
         parsed.feed.entries.forEach(function(entry) {
             console.log("Title: " + entry.title);
@@ -315,17 +315,7 @@ if (esClient === false ) {
         },
     ]);
 
-    // Dialog to ask for number of people in the party
-    bot.dialog('askForFeedName', [
-        function (session) {
-            builder.Prompts.text(session, "What is the Feed Name?");
-        },
-        function (session, results) {
-            session.endDialogWithResult(results);
-        }
-    ])
-
-    // Dialog to ask for the reservation name.
+     // Dialog to ask for the reservation name.
     bot.dialog('askForFeedURL', [
         function (session) {
             builder.Prompts.text(session, "What is the Feed URL");
@@ -337,18 +327,14 @@ if (esClient === false ) {
 
     // This is a news feed bot that uses multiple dialogs to prompt users for input.
     bot.dialog('getFeedInfo', [
-        function (session) {
-            session.beginDialog('askForFeedName');
-        },
         function (session, results) {
-            session.dialogData.feedName = results.response;
             session.beginDialog('askForFeedURL');
         },
         function (session, results) {
             session.dialogData.feedURL = results.response;
 
             // Process request and display reservation details
-            session.send(`Feed Name: ${session.dialogData.feedName}<br\>Feed URL: ${session.dialogData.feedURL}<br\>`);
+            session.send(`Reading Feed URL: ${session.dialogData.feedURL}<br\>`);
             firstFeed(session,session.dialogData.feedURL, session.message.address.channelId);
             session.endDialog();
         }
@@ -382,17 +368,6 @@ if (esClient === false ) {
         }
 
     });
-
-    // Receive messages from the user and respond by echoing each message back (prefixed with 'You said:')
-    //    var bot = new builder.UniversalBot(connector, function (session) {
-    //        session.send("You said: %s", session.message.text);
-    //        menuRet = checkAction(session);
-    //        session.send(menuRet);
-    //        session.endDialog();
-
-            //session.send(menuRet);
-            //checkNews(session);
-    //    });
 
 }
 
