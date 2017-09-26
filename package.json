@@ -9,6 +9,7 @@
     "botbuilder": "~3.9.1",
     "elasticsearch": "~13.3.1",
     "europa": "^4.0.0",
+    "node-europa": "^4.0.0",
     "request": "~2.81.0",
     "restify": "~5.2.0",
     "rss-parser": "~2.10.4"

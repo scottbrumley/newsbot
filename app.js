@@ -1,13 +1,14 @@
 var restify = require('restify');
 var builder = require('botbuilder');
 var parser = require('rss-parser');
-var md = require('html-md');
+var Europa = require('node-europa');
 var elasticsearch = require('elasticsearch');
 const http = require('http');
 const https = require('https');
 const request = require('request');
-var elastichost = "192.168.192.16"
+const europa = new Europa();
 
+var elastichost = "192.168.192.16"
 var elasticport = '9200';
 var esIndex = "newsfeed";
 var esType = "rss";
@@ -195,7 +196,72 @@ function addFeedToES(indexStr,typeStr,id, urlStr, titleStr, channel){
     });
 }
 
-function addArticleToES(indexStr,typeStr,id, guid, pubDate, link, categories, channel, isoDate){
+function postArticle(session, entry){
+    //if (entry.isoDate === n) {
+    console.log(entry.title + ':' + entry.link);
+    console.log(entry.pubDate);
+    console.log(entry.guid);
+    //console.log(entry.categories);
+    //console.log(entry.description);
+    //console.log(entry.isoDate);
+
+
+    var m,
+        urls = [],
+        rex = /<img[^>]+src="?([^"\s]+)"?\s*\/>/g;
+
+    while (m = rex.exec(entry.description)) {
+        urls.push(m[1]);
+    }
+    console.log(urls[0]);
+
+    var msg = new builder.Message(session)
+        .addAttachment({
+            contentType: "application/vnd.microsoft.card.adaptive",
+            content: {
+                "type": "AdaptiveCard",
+                "version": "0.5",
+                "body":
+                    [
+                        {
+                            "type": "Container",
+                            "items": [
+                                {
+                                    "type": "TextBlock",
+                                    "text": entry.title,
+                                    "size": "medium",
+                                    "weight": "bolder",
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": entry.pubDate,
+                                    "size": "small",
+                                    "weight": "bold"
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": europa.convert(entry.description),
+                                    "wrap": true
+                                }
+                            ]
+                        }
+                    ],
+                "actions": [
+                    {
+                        "type": "Action.OpenUrl",
+                        "url": entry.link,
+                        "title": "Learn More"
+                    }
+                ]
+            }
+        });
+    session.send(msg).endDialog();
+
+
+}
+
+function addArticles(session, entry, indexStr,typeStr,id, guid, pubDate, link, categories, channel, isoDate){
     host = elastichost;
     protocol = "http://";
     myURLStr = protocol + host + "/" + indexStr + "/" + typeStr + "/" + id + "-" + channel;
@@ -208,7 +274,7 @@ function addArticleToES(indexStr,typeStr,id, guid, pubDate, link, categories, ch
         tags: [categories],
         "@timestamp": isoDate,
         published: true
-    }
+    };
 
     var clientServerOptions = {
         uri: myURLStr,
@@ -218,18 +284,33 @@ function addArticleToES(indexStr,typeStr,id, guid, pubDate, link, categories, ch
         headers: {
             'Content-Type': 'application/json'
         }
-    }
+    };
     request(clientServerOptions, function (error, response) {
+        var articleStatus = JSON.parse(response.body);
+
         if (error) {
             console.log("Add To ES Error: ");
             console.log(error, response.body);
-            return;
+        } else {
+            if (articleStatus.created === true){
+                postArticle(session, entry);
+            } else {
+                return false;
+            }
         }
+        return;
     });
+
 }
 
-function firstFeed(urlStr, channel){
-    parser.parseURL(urlStr, function(err, parsed) {
+function firstFeed(session, urlStr, channel){
+    var options = {
+        customFields: {
+            item: ['description']
+        }
+    }
+
+    parser.parseURL(urlStr, options, function(err, parsed) {
         console.log(parsed.feed.title);
         rssId = new Buffer(urlStr).toString('base64');
         console.log(rssId);
@@ -237,15 +318,15 @@ function firstFeed(urlStr, channel){
 
         parsed.feed.entries.forEach(function(entry) {
             console.log("Title: " + entry.title);
-            console.log("URL: " + entry.link);
-            console.log("Date: " + entry.pubDate);
-            console.log("GUID: "  + entry.guid);
-            console.log("ID: " + new Buffer(entry.guid).toString('base64') + "-" + channel);
-            console.log("Categories: " + entry.categories);
-            console.log("Channel: " + channel);
-            console.log("ISO Date: " + entry.isoDate);
+            //console.log("URL: " + entry.link);
+            //console.log("Date: " + entry.pubDate);
+            //console.log("GUID: "  + entry.guid);
+            //console.log("ID: " + new Buffer(entry.guid).toString('base64') + "-" + channel);
+            //console.log("Categories: " + entry.categories);
+            //console.log("Channel: " + channel);
+            //console.log("ISO Date: " + entry.isoDate);
             articleId = new Buffer(entry.guid).toString('base64');
-            addArticleToES(esIndex,"article",articleId, entry.guid, entry.pubDate, entry.link, entry.categories,channel);
+            addArticles(session, entry, esIndex,"article",articleId, entry.guid, entry.pubDate, entry.link, entry.categories,channel);
         });
     });
 }
@@ -266,7 +347,7 @@ function AddFeed(session) {
 
             // Process request and display reservation details
             session.send(`Feed Name: ${session.dialogData.feedName}<br\>Feed URL: ${session.dialogData.feedURL}<br\>`);
-            firstFeed(session.dialogData.feedURL, session.message.address.channelId);
+            firstFeed(session,session.dialogData.feedURL, session.message.address.channelId);
             session.endDialog();
         }
     ]);
