@@ -79,80 +79,6 @@ function addIndex(indexStr){
         });
 }
 
-function checkAction(session){
-    var menuStr = "";
-    var commandStr = session.message.text;
-    var myWord = commandStr.split(" ");
-    switch(myWord[0]){
-        case "help":
-                menuStr = menuStr + "* **list feeds** 'Lists all news feed configured in this channel.'<br/>";
-                menuStr = menuStr + "* **add feed <feedname>** 'Add feed to channel.'<br/>";
-                menuStr = menuStr + "* **remove feed <feedname>** 'Remove feed from channel.'<br/>";
-                menuStr = menuStr + "* **edit feed <feedname>** 'Edit feed settings'<br/>";
-                menuStr = menuStr + "* **view feed <feedname>** 'View feed settings'<br/>";
-                session.send(menuStr);
-            break;
-        case "list":
-                if (myWord[1] == "feeds"){
-                    menuStr = "Listing Feeds:";
-                    return menuStr;
-                }
-            break;
-        case "add":
-            console.log('Add Feed');
-            if (myWord[1] == "feed") {
-
-                bot.dialog('greetings', [
-                    // Step 1
-                    function (session) {
-                        builder.Prompts.text(session, 'Hi! What is your name?');
-                    },
-                    // Step 2
-                    function (session, results) {
-                        session.endDialog(`Hello ${results.response}!`);
-                    }
-                ]);
-
-                session.beginDialog('greetings');
-
-                //menuStr = "Adding Feed " + myWord[2];
-                // This is a dinner reservation bot that uses a waterfall technique to prompt users for input.
-                //session.dialogData.name = myWord[2];
-                //builder.Prompts.text(session, "What is the URL for " + myWord[2] + " feed?");
-                //session.dialogData.url = results.response;
-                //builder.Prompts.text(session, "How often do you want to poll in hours?");
-                //session.dialogData.pollingInt = results.response;
-                // Process request and display reservation details
-                //session.send(`Adding Feed ${session.dialogData.name}: <br/>URL: ${session.dialogData.url} <br/>Polling Interval: ${session.dialogData.pollingInt}`);
-                //session.endDialog();
-
-            };
-            break;
-        case "remove":
-            if (myWord[1] == "feed"){
-                menuStr = "Removing Feed " + myWord[2];
-                return menuStr;
-            }
-            break;
-        case "edit":
-            if (myWord[1] == "feed"){
-                menuStr = "Editing Feed " + myWord[2];
-                return menuStr;
-            }
-            break;
-        case "view":
-            if (myWord[1] == "feed"){
-                menuStr = "Viewing Feed " + myWord[2];
-                return menuStr;
-            }
-            break;
-        default:
-            break;
-
-    }
-    return;
-}
-
 process.env.ESHOST = "192.168.192.16:9200"
 
 if(process.env.ESHOST) {
@@ -332,50 +258,9 @@ function firstFeed(session, urlStr, channel){
 }
 
 function AddFeed(session) {
-
-// This is a news feed bot that uses multiple dialogs to prompt users for input.
-    bot.dialog('getFeedInfo', [
-        function (session) {
-            session.beginDialog('askForFeedName');
-        },
-        function (session, results) {
-            session.dialogData.feedName = results.response;
-            session.beginDialog('askForFeedURL');
-        },
-        function (session, results) {
-            session.dialogData.feedURL = results.response;
-
-            // Process request and display reservation details
-            session.send(`Feed Name: ${session.dialogData.feedName}<br\>Feed URL: ${session.dialogData.feedURL}<br\>`);
-            firstFeed(session,session.dialogData.feedURL, session.message.address.channelId);
-            session.endDialog();
-        }
-    ]);
-
-
-// Dialog to ask for number of people in the party
-    bot.dialog('askForFeedName', [
-        function (session) {
-            builder.Prompts.text(session, "What is the Feed Name?");
-        },
-        function (session, results) {
-            session.endDialogWithResult(results);
-        }
-    ])
-
-// Dialog to ask for the reservation name.
-    bot.dialog('askForFeedURL', [
-        function (session) {
-            builder.Prompts.text(session, "What is the Feed URL");
-        },
-        function (session, results) {
-            session.endDialogWithResult(results);
-        }
-    ]);
-
     session.send("Enter Feed Information:");
     session.beginDialog('getFeedInfo');
-    return session;
+    return;
 };
 
 var esClient = connectES(elastichost);
@@ -428,6 +313,45 @@ if (esClient === false ) {
                 session.send('I am sorry but I didn\'t understand that. I need you to select one of the options below');
             }
         },
+    ]);
+
+    // Dialog to ask for number of people in the party
+    bot.dialog('askForFeedName', [
+        function (session) {
+            builder.Prompts.text(session, "What is the Feed Name?");
+        },
+        function (session, results) {
+            session.endDialogWithResult(results);
+        }
+    ])
+
+    // Dialog to ask for the reservation name.
+    bot.dialog('askForFeedURL', [
+        function (session) {
+            builder.Prompts.text(session, "What is the Feed URL");
+        },
+        function (session, results) {
+            session.endDialogWithResult(results);
+        }
+    ]);
+
+    // This is a news feed bot that uses multiple dialogs to prompt users for input.
+    bot.dialog('getFeedInfo', [
+        function (session) {
+            session.beginDialog('askForFeedName');
+        },
+        function (session, results) {
+            session.dialogData.feedName = results.response;
+            session.beginDialog('askForFeedURL');
+        },
+        function (session, results) {
+            session.dialogData.feedURL = results.response;
+
+            // Process request and display reservation details
+            session.send(`Feed Name: ${session.dialogData.feedName}<br\>Feed URL: ${session.dialogData.feedURL}<br\>`);
+            firstFeed(session,session.dialogData.feedURL, session.message.address.channelId);
+            session.endDialog();
+        }
     ]);
 
     // Check if team or bot joined
