@@ -187,6 +187,7 @@ function postArticle(session, entry){
 
 }
 
+// This function adds Feed articles to elastic search and posts new ones to the current Microsoft Teams channel
 function addArticles(session, entry, indexStr,typeStr,id, guid, pubDate, link, categories, channel, isoDate){
     host = elastichost;
     protocol = "http://";
@@ -229,13 +230,14 @@ function addArticles(session, entry, indexStr,typeStr,id, guid, pubDate, link, c
 
 }
 
-function firstFeed(session, urlStr, channel){
+function searchFeed(session, urlStr, channel){
     var options = {
         customFields: {
             item: ['description']
         }
     }
 
+    // Loop through articles in Feed.  Add them to elastic search if not there
     parser.parseURL(urlStr, options, function(err, parsed) {
         console.log(parsed.feed.title);
         rssId = new Buffer(urlStr).toString('base64');
@@ -335,7 +337,7 @@ if (esClient === false ) {
 
             // Process request and display reservation details
             session.send(`Reading Feed URL: ${session.dialogData.feedURL}<br\>`);
-            firstFeed(session,session.dialogData.feedURL, session.message.address.channelId);
+            searchFeed(session,session.dialogData.feedURL, session.message.address.channelId);
             session.endDialog();
         }
     ]);
