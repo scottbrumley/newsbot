@@ -6,13 +6,16 @@
     "start": "node ./bin/www"
   },
   "dependencies": {
-    "botbuilder": "~3.9.1",
+    "botbuilder": "~3.10.2",
+    "botbuilder-teams": "^0.1.6",
     "dtrace-provider": "^0.8.5",
     "elasticsearch": "~13.3.1",
     "europa": "^4.0.0",
+    "feedparser": "^2.2.1",
     "node-europa": "^4.0.0",
-    "request": "~2.81.0",
-    "restify": "~5.2.0",
-    "rss-parser": "~2.10.4"
+    "npm-check-updates": "^2.12.1",
+    "request": "~2.83.0",
+    "restify": "~6.0.1",
+    "rss-parser": "^2.10.6"
   }
 }

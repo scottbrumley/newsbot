@@ -1,6 +1,7 @@
 var restify = require('restify');
 var builder = require('botbuilder');
-var parser = require('rss-parser');
+var teams = require('botbuilder-teams');
+var rssParser = require('rss-parser');
 var Europa = require('node-europa');
 var elasticsearch = require('elasticsearch');
 const http = require('http');
@@ -241,37 +242,44 @@ function daysBetween(myDateStr1,myDateStr2){
     return parseInt(diffDays, 10);
 }
 
+function isEmpty(str) {
+    return (!str || 0 === str.length);
+}
+
 function searchFeed(session, urlStr, channel, daysToCheck){
-    var options = {
-        customFields: {
-            item: ['description']
-        }
-    };
+    console.log("URL : " + urlStr);
+    if (isEmpty(urlStr)) {
+        //
+    } else {
+        rssParser.parseURL(urlStr, function(err, parsed) {
+            if (err){
+                console.log("Error: " + err);
+                session.endDialog('There is some error');
+            } else {
+                console.log(parsed.feed.title);
+                var rssId = new Buffer(urlStr).toString('base64');
+                console.log(rssId);
+                addArticleToES(esIndex,"rss",rssId,urlStr,parsed.feed.title,channel);
 
-    // Loop through articles in Feed.  Add them to elastic search if not there
-    parser.parseURL(urlStr, options, function(err, parsed) {
-        console.log(parsed.feed.title);
-        var rssId = new Buffer(urlStr).toString('base64');
-        console.log(rssId);
-        addArticleToES(esIndex,"rss",rssId,urlStr,parsed.feed.title,channel);
+                parsed.feed.entries.forEach(function(entry) {
+                    console.log("Title: " + entry.title);
+                    //console.log("URL: " + entry.link);
+                    //console.log("Date: " + entry.pubDate);
+                    //console.log("GUID: "  + entry.guid);
+                    //console.log("ID: " + new Buffer(entry.guid).toString('base64') + "-" + channel);
+                    //console.log("Categories: " + entry.categories);
+                    //console.log("Channel: " + channel);
+                    //console.log("ISO Date: " + entry.isoDate);
+                    var articleId = new Buffer(entry.guid).toString('base64');
+                    var isodate = new Date().toISOString();
 
-        parsed.feed.entries.forEach(function(entry) {
-            console.log("Title: " + entry.title);
-            //console.log("URL: " + entry.link);
-            //console.log("Date: " + entry.pubDate);
-            //console.log("GUID: "  + entry.guid);
-            //console.log("ID: " + new Buffer(entry.guid).toString('base64') + "-" + channel);
-            //console.log("Categories: " + entry.categories);
-            //console.log("Channel: " + channel);
-            //console.log("ISO Date: " + entry.isoDate);
-            var articleId = new Buffer(entry.guid).toString('base64');
-            var isodate = new Date().toISOString();
-
-            if (daysBetween(isodate, entry.isoDate) <= daysToCheck) {
-                addArticles(session, entry, esIndex, "article", articleId, entry.guid, entry.pubDate, entry.link, entry.categories, channel);
+                    if (daysBetween(isodate, entry.isoDate) <= daysToCheck) {
+                        addArticles(session, entry, esIndex, "article", articleId, entry.guid, entry.pubDate, entry.link, entry.categories, channel);
+                    }
+                });
             }
         });
-    });
+    }
 }
 
 function AddFeed(session) {
@@ -280,16 +288,16 @@ function AddFeed(session) {
 }
 
 function checkFeeds(session){
-     //searchFeed(session, urlStr, channel, 7);
+    //searchFeed(session, urlStr, channel, 7);
     var myDate = new Date();
     var myTime = myDate.toISOString();
 
     session.send("Ping " + myTime);
     console.log("Ping " + myTime);
 
-    setTimeout(function(session) {
-        checkFeeds(session);
-    }, 60000);
+    setTimeout(function(session2) {
+        checkFeeds(session2);
+    }, 60000, session);
 }
 
 
@@ -306,7 +314,7 @@ if (esClient === false ) {
         });
 
     // Create chat connector for communicating with the Bot Framework Service
-        var connector = new builder.ChatConnector({
+        var connector = new teams.TeamsChatConnector({
             appId: process.env.MICROSOFT_APP_ID,
             appPassword: process.env.MICROSOFT_APP_PASSWORD
         });
@@ -322,6 +330,9 @@ if (esClient === false ) {
 
     var bot = new builder.UniversalBot(connector, [
         function (session) {
+
+        },
+        function (session) {
             builder.Prompts.choice(session,
                 'What do yo want to do today?',
                 [ListFeedsOption, AddFeedOption, RemoveFeedOption, EditFeedOption, ViewFeedOption],
@@ -336,6 +347,7 @@ if (esClient === false ) {
                         session.reset();
                         break;
                     case AddFeedOption:
+                        //session.beginDialog('FetchMemberList');
                         AddFeed(session);
                         break;
                 }
@@ -344,6 +356,49 @@ if (esClient === false ) {
             }
         }
     ]);
+
+    /*
+    bot.dialog('FetchMemberList', function (session) {
+        var conversationId = session.message.address.conversation.id;
+        connector.fetchMembers(session.message.address.serviceUrl, conversationId, function (err, result) {
+            if (err) {
+                session.endDialog('There is some error');
+            }
+            else {
+                session.endDialog('%s', JSON.stringify(result));
+            }
+        });
+    });
+    */
+
+    // Add first run dialog
+    bot.dialog('firstRun', [
+        function (session) {
+            // Update versio number and start Prompts
+            // - The version number needs to be updated first to prevent re-triggering
+            //   the dialog.
+            session.userData.version = 1.0;
+            builder.Prompts.text(session, "Hello... What's your name?");
+        },
+        function (session, results) {
+            // We'll save the users name and send them an initial greeting. All
+            // future messages from the user will be routed to the root dialog.
+            session.userData.name = results.response;
+            session.endDialog("Hi %s, say something to me and I'll echo it back.", session.userData.name);
+        }
+    ]).triggerAction({
+        onFindAction: function (context, callback) {
+            // Trigger dialog if the users version field is less than 1.0
+            // - When triggered we return a score of 1.1 to ensure the dialog is always triggered.
+            var ver = context.userData.version || 0;
+            var score = ver < 1.0 ? 1.1: 0.0;
+            callback(null, score);
+        },
+        onInterrupted: function (session, dialogId, dialogArgs, next) {
+            // Prevent dialog from being interrupted.
+            session.send("Sorry... We need some information from you first.");
+        }
+    });
 
      // Dialog to ask for the reservation name.
     bot.dialog('askForFeedURL', [
@@ -390,7 +445,6 @@ if (esClient === false ) {
                     var botmessage = new builder.Message()
                         .address(msg.address)
                         .text('Welcome! I am MacBot. If you need some help just type "@macbot help" at any time');
-
                     bot.send(botmessage, function (err) {
                     });
                 }
