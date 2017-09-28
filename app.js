@@ -8,17 +8,16 @@ const https = require('https');
 const request = require('request');
 const europa = new Europa();
 
-var elastichost = "192.168.192.16"
+var elastichost = "192.168.192.16";
 var elasticport = '9200';
 var esIndex = "newsfeed";
-var esType = "rss";
 
 function connectES(host){
     var client = new elasticsearch.Client({
         host: host,
         log: 'trace'
     });
-    if (!client){ return false };
+    if (!client){ return false }
     client.ping({
         // ping usually has a 3000ms timeout
         requestTimeout: 1000
@@ -34,11 +33,11 @@ function connectES(host){
 }
 
 function addIndex(indexStr){
-    host = elastichost;
-    protocol = "http://";
-    myURLStr = protocol + host + "/" + indexStr;
+    var host = elastichost;
+    var protocol = "http://";
+    var myURLStr = protocol + host + "/" + indexStr;
 
-    jsonBody = {
+    var jsonBody = {
         "mappings": {
             "rss": {
                 "properties": {
@@ -59,7 +58,7 @@ function addIndex(indexStr){
                 }
             }
         }
-    }
+    };
 
         var clientServerOptions = {
             uri: myURLStr,
@@ -69,17 +68,16 @@ function addIndex(indexStr){
             headers: {
                 'Content-Type': 'application/json'
             }
-        }
+        };
         request(clientServerOptions, function (error, response) {
             if (error) {
                 console.log("Add Index Error: ");
                 console.log(error, response.body);
-                return;
             }
         });
 }
 
-process.env.ESHOST = "192.168.192.16:9200"
+process.env.ESHOST = "192.168.192.16:9200";
 
 if(process.env.ESHOST) {
     console.log('It is set!');
@@ -91,18 +89,19 @@ else {
 }
 
 function addArticleToES(indexStr,typeStr,id, urlStr, titleStr, channel){
-    host = elastichost;
-    protocol = "http://";
-    myURLStr = protocol + host + "/" + indexStr + "/" + typeStr + "/" + id + "-" + channel;
-    var isodate = new Date().toISOString()
+    var host = elastichost;
+    var protocol = "http://";
+    var myURLStr = protocol + host + "/" + indexStr + "/" + typeStr + "/" + id + "-" + channel;
+    var isodate = new Date().toISOString();
 
-    jsonBody = {
+
+    var jsonBody = {
         link: urlStr,
         channel: channel,
         title: titleStr,
         "@timestamp": isodate,
         published: true
-    }
+    };
 
     var clientServerOptions = {
         uri: myURLStr,
@@ -112,12 +111,11 @@ function addArticleToES(indexStr,typeStr,id, urlStr, titleStr, channel){
         headers: {
             'Content-Type': 'application/json'
         }
-    }
+    };
     request(clientServerOptions, function (error, response) {
         if (error) {
             console.log("Add To ES Error: ");
             console.log(error, response.body);
-            return;
         }
     });
 }
@@ -189,19 +187,19 @@ function postArticle(session, entry){
 
 // This function adds Feed articles to elastic search and posts new ones to the current Microsoft Teams channel
 function addArticles(session, entry, indexStr,typeStr,id, guid, pubDate, link, categories, channel, isoDate){
-    host = elastichost;
-    protocol = "http://";
-    myURLStr = protocol + host + "/" + indexStr + "/" + typeStr + "/" + id + "-" + channel;
+    var host = elastichost;
+    var protocol = "http://";
+    var myURLStr = protocol + host + "/" + indexStr + "/" + typeStr + "/" + id + "-" + channel;
 
-    jsonBody = {
-        published_at: pubDate,
-        guid: guid,
-        link: link,
-        channel: channel,
-        tags: [categories],
-        "@timestamp": isoDate,
-        published: true
-    };
+    var jsonBody = {
+            published_at: pubDate,
+            guid: guid,
+            link: link,
+            channel: channel,
+            tags: [categories],
+            "@timestamp": isoDate,
+            published: true
+        };
 
     var clientServerOptions = {
         uri: myURLStr,
@@ -225,22 +223,36 @@ function addArticles(session, entry, indexStr,typeStr,id, guid, pubDate, link, c
                 return false;
             }
         }
-        return;
     });
 
 }
 
+function daysBetween(myDateStr1,myDateStr2){
+    var myDate1 = new Date(myDateStr1);
+    var myDate2 = new Date(myDateStr2);
+    var timeDiff = myDate1 - myDate2;
+
+    if (timeDiff > 1440e3) {
+        var diffDays = Math.round(timeDiff / 60e3);
+        diffDays = diffDays / 1440;
+    } else {
+        diffDays = 1.0;
+    }
+    return parseInt(diffDays, 10);
+}
+
 function searchFeed(session, urlStr, channel){
+    daysToCheck = 7;
     var options = {
         customFields: {
             item: ['description']
         }
-    }
+    };
 
     // Loop through articles in Feed.  Add them to elastic search if not there
     parser.parseURL(urlStr, options, function(err, parsed) {
         console.log(parsed.feed.title);
-        rssId = new Buffer(urlStr).toString('base64');
+        var rssId = new Buffer(urlStr).toString('base64');
         console.log(rssId);
         addArticleToES(esIndex,"rss",rssId,urlStr,parsed.feed.title,channel);
 
@@ -253,8 +265,12 @@ function searchFeed(session, urlStr, channel){
             //console.log("Categories: " + entry.categories);
             //console.log("Channel: " + channel);
             //console.log("ISO Date: " + entry.isoDate);
-            articleId = new Buffer(entry.guid).toString('base64');
-            addArticles(session, entry, esIndex,"article",articleId, entry.guid, entry.pubDate, entry.link, entry.categories,channel);
+            var articleId = new Buffer(entry.guid).toString('base64');
+            var isodate = new Date().toISOString();
+
+            if (daysBetween(isodate, entry.isoDate) <= daysToCheck) {
+                addArticles(session, entry, esIndex, "article", articleId, entry.guid, entry.pubDate, entry.link, entry.categories, channel);
+            }
         });
     });
 }
@@ -262,8 +278,21 @@ function searchFeed(session, urlStr, channel){
 function AddFeed(session) {
     session.send("Enter Feed Information:");
     session.beginDialog('getFeedInfo');
-    return;
-};
+}
+
+function checkFeeds(session){
+     //searchFeed(session, urlStr, channel);
+    var myDate = new Date();
+    var myTime = myDate.toISOString();
+
+    session.send("Ping " + myTime);
+    console.log("Ping " + myTime);
+
+    setTimeout(function(session) {
+        checkFeeds(session);
+    }, 60000);
+}
+
 
 var esClient = connectES(elastichost);
 if (esClient === false ) {
@@ -314,7 +343,7 @@ if (esClient === false ) {
             } else {
                 session.send('I am sorry but I didn\'t understand that. I need you to select one of the options below');
             }
-        },
+        }
     ]);
 
      // Dialog to ask for the reservation name.
@@ -329,7 +358,7 @@ if (esClient === false ) {
 
     // This is a news feed bot that uses multiple dialogs to prompt users for input.
     bot.dialog('getFeedInfo', [
-        function (session, results) {
+        function (session) {
             session.beginDialog('askForFeedURL');
         },
         function (session, results) {
@@ -369,7 +398,6 @@ if (esClient === false ) {
             }
         }
 
-    });
-
+    })
 }
 
