@@ -241,8 +241,7 @@ function daysBetween(myDateStr1,myDateStr2){
     return parseInt(diffDays, 10);
 }
 
-function searchFeed(session, urlStr, channel){
-    daysToCheck = 7;
+function searchFeed(session, urlStr, channel, daysToCheck){
     var options = {
         customFields: {
             item: ['description']
@@ -281,7 +280,7 @@ function AddFeed(session) {
 }
 
 function checkFeeds(session){
-     //searchFeed(session, urlStr, channel);
+     //searchFeed(session, urlStr, channel, 7);
     var myDate = new Date();
     var myTime = myDate.toISOString();
 
@@ -366,7 +365,7 @@ if (esClient === false ) {
 
             // Process request and display reservation details
             session.send(`Reading Feed URL: ${session.dialogData.feedURL}<br\>`);
-            searchFeed(session,session.dialogData.feedURL, session.message.address.channelId);
+            searchFeed(session,session.dialogData.feedURL, session.message.address.channelId, 7);
             session.endDialog();
         }
     ]);
