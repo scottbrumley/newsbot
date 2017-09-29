@@ -66,3 +66,4 @@ routes/
 views/
 .idea/
 projectFilesBackup
+package-lock.json
